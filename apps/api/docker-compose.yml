@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg17
+    container_name: gold-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+      POSTGRES_DB: gold_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gold_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    profiles: ["app"]
+    build: .
+    container_name: gold-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_dev_password@postgres:5432/gold_agent?schema=public
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "npm run prisma:push && node dist/database/setup-timescale.js && npm run start"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: gold-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

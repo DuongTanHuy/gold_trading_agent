@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CandleTimeframe {
+  M1
+  M5
+  M15
+  H1
+  H4
+  D1
+}
+
+model MarketTick {
+  // Timescale hypertable unique constraints must include the partition key.
+  id             String   @default(cuid())
+  symbol         String
+  provider       String
+  feedId         String
+  price          Decimal  @db.Decimal(20, 10)
+  confidence     Decimal? @db.Decimal(20, 10)
+  publishTime    DateTime @db.Timestamptz(6)
+  receivedAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([publishTime, id])
+  @@unique([publishTime, feedId])
+  @@index([symbol, publishTime(sort: Desc)])
+  @@map("market_ticks")
+}
+
+model MarketCandle {
+  symbol      String
+  timeframe   CandleTimeframe
+  openTime    DateTime @db.Timestamptz(6)
+  open        Decimal  @db.Decimal(20, 10)
+  high        Decimal  @db.Decimal(20, 10)
+  low         Decimal  @db.Decimal(20, 10)
+  close       Decimal  @db.Decimal(20, 10)
+  tickCount   Int      @default(0)
+  lastTickTime DateTime @db.Timestamptz(6)
+  isComplete  Boolean  @default(false)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@id([symbol, timeframe, openTime])
+  @@index([symbol, timeframe, openTime(sort: Desc)])
+  @@map("market_candles")
+}
